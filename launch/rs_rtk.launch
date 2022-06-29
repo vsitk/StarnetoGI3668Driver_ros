@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+     <node  name="rs_rtk" pkg="rs_rtk" type="rs_rtk_node">
+        <param name="frame_id" value="/ins" />
+        <param name="topic_gps" value="/rs/gps" />
+        <param name="topic_imu" value="/rs/imu" />
+        <param name="topic_odom" value="/rs/odom" />
+        <param name="port_rtk" value="/dev/ttyUSB0" />
+        <param name="baudrate" value="230400" />
+     </node>
+</launch>

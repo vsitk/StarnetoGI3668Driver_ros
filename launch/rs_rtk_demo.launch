@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+     <arg name="log" default="false"/>
+     <arg name="auto_search" default="false"/>
+
+     <node  name="rs_rtk" pkg="rs_rtk" type="rs_rtk_node" output="screen">
+        <param name="package_name" value="$(find rs_rtk)" if="$(arg log)"/>
+        <param name="frame" value="gps" />
+        <param name="topic" value="/gps" />
+        <param name="port_rtk" value="/dev/ttyUSB0"  unless="$(arg auto_search)" />
+        <param name="baudrate" value="115200" />
+     </node>
+
+     <node pkg="rs_rtk"  name="visualize_rtk"  type="visualize_rtk_node"  />
+
+     <node pkg="rviz" type="rviz" name="rviz" respawn="true" args="-d $(find rs_rtk)/config/rs_rtk.rviz"/>
+
+</launch>

@@ -1,0 +1,13 @@
+Header header
+uint16 gps_week_number
+uint32 gps_week_milliseconds
+float64 latitude         
+float64 longitude  
+float64 height 
+float64 north_velocity
+float64 east_velocity
+float64 up_velocity
+float64 roll
+float64 pitch
+float64 azimuth
+uint32 status
