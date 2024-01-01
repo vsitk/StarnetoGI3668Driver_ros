@@ -16,9 +16,9 @@
  * Robosense RTK-GPS driver.
  *
  */
-#include <rs_rtk/gps.h>
+#include <starneto_driver/gps.h>
 
-#define BUFF_SIZE 1024 * 5
+#define BUFF_SIZE 256
 
 using namespace boost::lambda;
 using namespace boost::asio;
@@ -40,7 +40,8 @@ GPSDriver::GPSDriver(ros::NodeHandle nh, ros::NodeHandle nh_private)
   navsat_pub_ = nh_.advertise<sensor_msgs::NavSatFix>(s_topic_gps_, 1);
   navimu_pub_ = nh_.advertise<sensor_msgs::Imu>(s_topic_imu_, 1);
   odom_pub_ = nh_.advertise<nav_msgs::Odometry>(s_topic_odom_, 1);
-  inspva_pub_ = nh_.advertise<rs_rtk::inspva>(s_topic_inspva_, 1);
+  inspva_pub_ = nh_.advertise<starneto_driver::inspva>(s_topic_inspva_, 1);
+  heartbeat_pub_ = nh_.advertise<std_msgs::Bool>(s_topic_inspva_ + "/heartbeat", 1);
   
   runGPS(s_port_, n_baudrate_);
 }
@@ -63,7 +64,7 @@ void GPSDriver::initParams()
   nh_private_.param("baudrate", n_baudrate_, n_baudrate_default_);
   nh_private_.param("debug_mode", if_log_, false);
 
-  /*if (nh_private_.getParam("package_name", sPackage_path_))
+  if (nh_private_.getParam("package_name", sPackage_path_))
   {
     if_log_ = true;
     time_t t = time(0);  // get time now
@@ -84,7 +85,7 @@ void GPSDriver::initParams()
     fileName = folder_path + "gps_data" + ".txt";
 
     log_data_.open(fileName, std::ios::out | std::ios::app);
-  }*/
+  }
 
   if (!nh_private_.getParam("port_rtk", s_port_))
   {
@@ -130,7 +131,7 @@ string GPSDriver::scanPort()
         chr_buf[i] = *itr;
       }
       vector<string> serial_input_line;
-      boost::split(serial_input_line, chr_buf, boost::is_any_of("\r\n"));
+      boost::split(serial_input_line, chr_buf, boost::is_any_of("\n"));
       int flag = 0;
       for (int l = 0; l < serial_input_line.size(); l++)
       {
@@ -162,7 +163,7 @@ string GPSDriver::scanPort()
 
 void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
 {
-  char chr_buffer[BUFF_SIZE];
+  // char chr_buffer[BUFF_SIZE];
   try
   {
     io_service io;
@@ -174,44 +175,50 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
     port.set_option(serial_port_base::stop_bits(serial_port_base::stop_bits::one));
 
     // boost::array<unsigned char, BUFF_SIZE> data_buf;
-    string last_serial_input_line;
+    string prev_log_remain_data;
 
     ros::Rate loop_rate(100);
 
     uint32_t nCounter = 0;
     while (ros::ok())
     {
-      memset(chr_buffer, 0, BUFF_SIZE);
+      // memset(chr_buffer, 0, BUFF_SIZE);
       try
       {
         boost::array<unsigned char, BUFF_SIZE> data_buf;
         size_t usLength = boost::asio::read(port, buffer(data_buf, BUFF_SIZE), transfer_exactly(BUFF_SIZE));
 
-        boost::array<unsigned char, BUFF_SIZE>::iterator itr = data_buf.begin();
-        for (int i = 0; itr != data_buf.end(); itr++, i++)
-        {
-          chr_buffer[i] = *itr;
-        }
+        // boost::array<unsigned char, BUFF_SIZE>::iterator itr = data_buf.begin();
+        // for (int i = 0; itr != data_buf.end(); itr++, i++)
+        // {
+        //   chr_buffer[i] = *itr;
+        // }
         if (usLength > 0)
         {
           vector<string> serial_input_line;
-          boost::split(serial_input_line, chr_buffer, boost::is_any_of("\r\n"));
+          boost::split(serial_input_line, (char *)data_buf.c_array(), boost::is_any_of("\n"));
 
-          for (unsigned int l = 0; l < serial_input_line.size(); l++)
+          for (unsigned int l = 0; l < serial_input_line.size() - 1; l++)
           {
+            if (l == 0 && !boost::starts_with(serial_input_line[l], "$GP")) {
+              serial_input_line[l] = prev_log_remain_data.substr(0, prev_log_remain_data.length() - 6) + serial_input_line[l];
+            }
+            // std::cout << "[" << l << "]" << serial_input_line[l] << std::endl;
+
+            #if 1
             vector<string> aryNMEAstring;
             boost::split(aryNMEAstring, serial_input_line[l], boost::is_any_of(","));
 
             if (if_log_ && boost::starts_with(serial_input_line[l], "$GP"))
             {
               log_data_ << serial_input_line[l] << std::endl;
-              std::cout << l << " " << serial_input_line[l] << " | " << aryNMEAstring.size() << std::endl;
+              // std::cout << l << " " << serial_input_line[l] << " | " << aryNMEAstring.size() << std::endl;
             }
-            // if (l == 0 && !boost::starts_with(serial_input_line[l], "$GP")) {
-            //   serial_input_line[l] = last_serial_input_line.substr(0, last_serial_input_line.size() - 6) + serial_input_line[l];
-            // }
 
-            if (boost::starts_with(serial_input_line[l], "$GPCHC") && aryNMEAstring.size() >= 24)
+            // std::cout << serial_input_line[l] << std::endl;
+
+            // if (boost::starts_with(serial_input_line[l], "$GPCHC") && aryNMEAstring.size() >= 24)
+            if (boost::starts_with(serial_input_line[l], "$GPCHC"))
             {
               uint16_t gps_week = atoi(aryNMEAstring[1].c_str());
               double gps_time = atof(aryNMEAstring[2].c_str());
@@ -277,7 +284,7 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
                 inspva_.pitch                 =     pitch;
                 inspva_.azimuth               =     yaw;
                 inspva_.status                =     status;
-                inspva_.header.stamp          =     ros::Time().now();
+                inspva_.header.stamp          =     ros::Time(gps2unix(inspva_.gps_week_number * 604800 + inspva_.gps_week_milliseconds * 0.001));
                 inspva_.header.frame_id       =     s_frame_id_;
                 inspva_.header.seq            =     nCounter;
 
@@ -334,9 +341,16 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
             //                << std::endl;
             //    }
             //  }
+
+            ++nCounter;
+            if (nCounter % 100 == 0) {
+              std_msgs::Bool heartbeat;
+              heartbeat.data = 1;
+              heartbeat_pub_.publish(heartbeat);
+            }
+            #endif
           }
-          // last_serial_input_line = serial_input_line[serial_input_line.size() - 1];
-          ++nCounter;
+          prev_log_remain_data = serial_input_line[serial_input_line.size() - 1]; 
         }
       }
 
