@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+     <arg name="log" default="false"/>
+     <arg name="auto_search" default="false"/>
+
+     <node  name="starneto_driver" pkg="starneto_driver" type="starneto_driver_node" output="screen">
+        <param name="package_name" value="$(find starneto_driver)" if="$(arg log)"/>
+        <param name="frame" value="gps" />
+        <param name="topic" value="/gps" />
+        <param name="port_rtk" value="/dev/ttyUSB0"  unless="$(arg auto_search)" />
+        <param name="baudrate" value="115200" />
+     </node>
+
+     <node pkg="starneto_driver"  name="visualize_rtk"  type="visualize_rtk_node"  />
+
+     <node pkg="rviz" type="rviz" name="rviz" respawn="true" args="-d $(find starneto_driver)/config/starneto_driver.rviz"/>
+
+</launch>

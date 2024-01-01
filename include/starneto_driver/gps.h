@@ -42,7 +42,7 @@
 #include <sensor_msgs/Imu.h>
 #include <tf/tf.h>
 #include <tf/transform_datatypes.h>
-#include <rs_rtk/gps.h>
+#include <starneto_driver/gps.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatStatus.h>
@@ -50,7 +50,9 @@
 #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
-#include "rs_rtk/inspva.h"
+#include "starneto_driver/inspva.h"
+#include <std_msgs/Bool.h>
+#include "starneto_driver/time_conversion.h"
 
 using namespace std;
 
@@ -99,11 +101,12 @@ private:
   ros::Publisher navimu_pub_;
   ros::Publisher odom_pub_;
   ros::Publisher inspva_pub_;
+  ros::Publisher heartbeat_pub_;
 
   sensor_msgs::NavSatFix fix_;
   sensor_msgs::Imu imu_;
   nav_msgs::Odometry odom_;
-  rs_rtk::inspva inspva_;
+  starneto_driver::inspva inspva_;
 
   struct STime stcTime_;
   struct SLonLat stcLonLat_;

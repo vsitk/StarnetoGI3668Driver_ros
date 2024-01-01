@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <launch>
-     <node  name="rs_rtk" pkg="rs_rtk" type="rs_rtk_node" output="screen">
+     <node  name="starneto_driver" pkg="starneto_driver" type="starneto_driver_node" output="screen">
         <param name="frame_id" value="/chc" />
         <param name="topic_gps" value="/rs/gps" />
-        <param name="topic_imu" value="/chc/imu" />
+        <param name="topic_imu" value="/imu/data_raw" />
         <param name="topic_odom" value="/rs/odom" />
         <param name="topic_inspva" value="/chc/inspva" />
         <param name="port_rtk" value="/dev/ttyUSB0" />

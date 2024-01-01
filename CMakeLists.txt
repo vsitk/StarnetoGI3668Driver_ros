@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(rs_rtk)
+project(starneto_driver)
 add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -32,19 +32,19 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_library(rs_rtk STATIC src/GPSDriver.cpp)
-# add_library(visualize_rs_rtk STATIC src/visualize_GPS_path.cpp)
+add_library(starneto_driver STATIC src/GPSDriver.cpp)
+# add_library(visualize_starneto_driver STATIC src/visualize_GPS_path.cpp)
 
-add_executable(${PROJECT_NAME}_node src/rs_rtk_node.cpp)
+add_executable(${PROJECT_NAME}_node src/starneto_driver_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node
-  rs_rtk
+  starneto_driver
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   )
 
 # add_executable(visualize_rtk_node src/visualize_rtk_node.cpp)
 # target_link_libraries(visualize_rtk_node
-#   visualize_rs_rtk
+#   visualize_starneto_driver
 #   ${catkin_LIBRARIES}
 #   ${PCL_LIBRARIES}
 #   )
@@ -57,7 +57,7 @@ install(TARGETS ${PROJECT_NAME}_node #visualize_rtk_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(TARGETS ${PROJECT_NAME} #visualize_rs_rtk
+install(TARGETS ${PROJECT_NAME} #visualize_starneto_driver
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

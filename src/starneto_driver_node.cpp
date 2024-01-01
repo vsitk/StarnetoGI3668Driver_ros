@@ -16,11 +16,11 @@
  * Robosense RTK-GPS driver.
  *
  */
-#include <rs_rtk/gps.h>
+#include <starneto_driver/gps.h>
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "rs_rtk");
+  ros::init(argc, argv, "starneto_driver");
   ros::NodeHandle n;
   ros::NodeHandle n_private("~");
   GPSDriver gps(n, n_private);
