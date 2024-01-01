@@ -49,6 +49,7 @@
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Vector3.h>
 #include <nav_msgs/Odometry.h>
+#include <sensor_msgs/Imu.h>
 #include "rs_rtk/inspva.h"
 
 using namespace std;
@@ -112,6 +113,7 @@ private:
   string s_topic_gps_;
   string s_topic_imu_;
   string s_topic_odom_;
+  string s_topic_inspva_;
   string s_port_;
   string sLog_path_;
   string sPackage_path_;

@@ -33,7 +33,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 add_library(rs_rtk STATIC src/GPSDriver.cpp)
-add_library(visualize_rs_rtk STATIC src/visualize_GPS_path.cpp)
+# add_library(visualize_rs_rtk STATIC src/visualize_GPS_path.cpp)
 
 add_executable(${PROJECT_NAME}_node src/rs_rtk_node.cpp)
 target_link_libraries(${PROJECT_NAME}_node
@@ -42,22 +42,22 @@ target_link_libraries(${PROJECT_NAME}_node
   ${PCL_LIBRARIES}
   )
 
-add_executable(visualize_rtk_node src/visualize_rtk_node.cpp)
-target_link_libraries(visualize_rtk_node
-  visualize_rs_rtk
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  )
+# add_executable(visualize_rtk_node src/visualize_rtk_node.cpp)
+# target_link_libraries(visualize_rtk_node
+#   visualize_rs_rtk
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   )
 
 #############
 ## Install ##
 #############
 
-install(TARGETS ${PROJECT_NAME}_node visualize_rtk_node
+install(TARGETS ${PROJECT_NAME}_node #visualize_rtk_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(TARGETS ${PROJECT_NAME} visualize_rs_rtk
+install(TARGETS ${PROJECT_NAME} #visualize_rs_rtk
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

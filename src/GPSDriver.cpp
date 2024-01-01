@@ -18,7 +18,7 @@
  */
 #include <rs_rtk/gps.h>
 
-#define BUFF_SIZE 5120
+#define BUFF_SIZE 1024 * 5
 
 using namespace boost::lambda;
 using namespace boost::asio;
@@ -40,7 +40,7 @@ GPSDriver::GPSDriver(ros::NodeHandle nh, ros::NodeHandle nh_private)
   navsat_pub_ = nh_.advertise<sensor_msgs::NavSatFix>(s_topic_gps_, 1);
   navimu_pub_ = nh_.advertise<sensor_msgs::Imu>(s_topic_imu_, 1);
   odom_pub_ = nh_.advertise<nav_msgs::Odometry>(s_topic_odom_, 1);
-  inspva_pub_ = nh_.advertise<rs_rtk::inspva>("/rs/inspva", 1);
+  inspva_pub_ = nh_.advertise<rs_rtk::inspva>(s_topic_inspva_, 1);
   
   runGPS(s_port_, n_baudrate_);
 }
@@ -59,7 +59,9 @@ void GPSDriver::initParams()
   nh_private_.param("topic_gps", s_topic_gps_, s_topic_default_);
   nh_private_.param("topic_imu", s_topic_imu_, s_topic_default_);
   nh_private_.param("topic_odom", s_topic_odom_, s_topic_default_);
+  nh_private_.param("topic_inspva", s_topic_inspva_, s_topic_default_);
   nh_private_.param("baudrate", n_baudrate_, n_baudrate_default_);
+  nh_private_.param("debug_mode", if_log_, false);
 
   /*if (nh_private_.getParam("package_name", sPackage_path_))
   {
@@ -171,16 +173,18 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
     port.set_option(serial_port_base::parity(serial_port_base::parity::none));
     port.set_option(serial_port_base::stop_bits(serial_port_base::stop_bits::one));
 
-    boost::array<unsigned char, BUFF_SIZE> data_buf;
+    // boost::array<unsigned char, BUFF_SIZE> data_buf;
     string last_serial_input_line;
 
     ros::Rate loop_rate(100);
 
-    int nCounter = 0;
+    uint32_t nCounter = 0;
     while (ros::ok())
     {
+      memset(chr_buffer, 0, BUFF_SIZE);
       try
       {
+        boost::array<unsigned char, BUFF_SIZE> data_buf;
         size_t usLength = boost::asio::read(port, buffer(data_buf, BUFF_SIZE), transfer_exactly(BUFF_SIZE));
 
         boost::array<unsigned char, BUFF_SIZE>::iterator itr = data_buf.begin();
@@ -198,46 +202,47 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
             vector<string> aryNMEAstring;
             boost::split(aryNMEAstring, serial_input_line[l], boost::is_any_of(","));
 
-            /*if (if_log_ && boost::starts_with(serial_input_line[l], "$GP"))
+            if (if_log_ && boost::starts_with(serial_input_line[l], "$GP"))
             {
               log_data_ << serial_input_line[l] << std::endl;
-              std::cout << l << " " << serial_input_line[l] << std::endl;
-            }*/
-            if (l == 0 && !boost::starts_with(serial_input_line[l], "$GP")) {
-              serial_input_line[l] = last_serial_input_line.substr(0, last_serial_input_line.size() - 6) + serial_input_line[l];
+              std::cout << l << " " << serial_input_line[l] << " | " << aryNMEAstring.size() << std::endl;
             }
+            // if (l == 0 && !boost::starts_with(serial_input_line[l], "$GP")) {
+            //   serial_input_line[l] = last_serial_input_line.substr(0, last_serial_input_line.size() - 6) + serial_input_line[l];
+            // }
 
-            if (boost::starts_with(serial_input_line[l], "$GPFPD") && aryNMEAstring.size() >= 15)
+            if (boost::starts_with(serial_input_line[l], "$GPCHC") && aryNMEAstring.size() >= 24)
             {
-              double in_latitude = atof(aryNMEAstring[6].c_str());
-              double in_longitude = atof(aryNMEAstring[7].c_str());
-              double in_altitude = atof(aryNMEAstring[8].c_str());
+              uint16_t gps_week = atoi(aryNMEAstring[1].c_str());
+              double gps_time = atof(aryNMEAstring[2].c_str());
+
+              double yaw = (atof(aryNMEAstring[3].c_str()));
               double pitch = atof(aryNMEAstring[4].c_str()) / 180.0 * M_PI;
               double roll = atof(aryNMEAstring[5].c_str()) / 180.0 * M_PI;
-              double yaw = (atof(aryNMEAstring[3].c_str()));
-              double velocity_x = atof(aryNMEAstring[9].c_str());
-              double velocity_y = atof(aryNMEAstring[10].c_str());
-              double velocity_z = atof(aryNMEAstring[11].c_str());
 
-              if (!(isnan(in_latitude) || isnan(in_longitude) || isnan(in_altitude) || isnan(pitch) || isnan(roll) ||
+              double gyro_x = atof(aryNMEAstring[6].c_str()) / 180.0 * M_PI;
+              double gyro_y = atof(aryNMEAstring[7].c_str()) / 180.0 * M_PI;
+              double gyro_z = atof(aryNMEAstring[8].c_str()) / 180.0 * M_PI;
+
+              double acc_x = (atof(aryNMEAstring[9].c_str())) * 9.780;
+              double acc_y = atof(aryNMEAstring[10].c_str()) * 9.780;
+              double acc_z = atof(aryNMEAstring[11].c_str()) * 9.780;
+              
+              double latitude = atof(aryNMEAstring[12].c_str());
+              double longitude = atof(aryNMEAstring[13].c_str());
+              double altitude = atof(aryNMEAstring[14].c_str());
+             
+              double velocity_x = atof(aryNMEAstring[15].c_str());
+              double velocity_y = atof(aryNMEAstring[16].c_str());
+              double velocity_z = atof(aryNMEAstring[17].c_str());
+
+              double velocity_v = atof(aryNMEAstring[18].c_str());
+
+              if (!(isnan(latitude) || isnan(longitude) || isnan(altitude) || isnan(pitch) || isnan(roll) ||
                   isnan(yaw) || isnan(velocity_x) || isnan(velocity_y) || isnan(velocity_z)) )
               {
-                const char* c_status = aryNMEAstring[15].c_str();
-
-                if ((int)*(c_status) >= 48 && (int)*(c_status) <= 57)
-                  fix_.status.service = (uint16_t)(*(c_status) - '0');
-
-                if ((int)*(c_status + 1) >= 48 && (int)*(c_status + 1) <= 57)
-                  fix_.status.status = (int)(*(c_status + 1) - '0');
-                else if (*(c_status + 1) == 'A')
-                  fix_.status.status = 10;
-                else if (*(c_status + 1) == 'B')
-                  fix_.status.status = 11;
-                else if (*(c_status + 1) == 'C')
-                  fix_.status.status = 12;
-                else
-                  fix_.status.status = -1;
-
+                const uint8_t status = atoi(aryNMEAstring[21].c_str());
+                
                 double yaw_ECEF;
                 if (yaw >= 0.0 && yaw <= 270.0)
                   yaw_ECEF = (90.0 - yaw) / 180.0 * M_PI;
@@ -247,77 +252,90 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
                 geometry_msgs::Quaternion quat;
                 tf::Quaternion quat_tf = tf::createQuaternionFromRPY(roll, pitch, yaw_ECEF);
                 tf::quaternionTFToMsg(quat_tf, quat);
-                odom_.pose.pose.orientation = quat;
-                odom_.twist.twist.linear.x = velocity_x;
-                odom_.twist.twist.linear.y = velocity_y;
-                odom_.twist.twist.linear.z = velocity_z;
-                odom_.header.stamp = ros::Time().now();
-                odom_.header.frame_id = s_frame_id_;
+                // odom_.pose.pose.orientation = quat;
+                // odom_.twist.twist.linear.x = velocity_x;
+                // odom_.twist.twist.linear.y = velocity_y;
+                // odom_.twist.twist.linear.z = velocity_z;
+                // odom_.header.stamp = ros::Time().now();
+                // odom_.header.frame_id = s_frame_id_;
 
-                fix_.latitude = in_latitude;
-                fix_.longitude = in_longitude;
-                fix_.altitude = in_altitude;
-                fix_.header.stamp = odom_.header.stamp;
-                fix_.header.frame_id = s_frame_id_;
+                // fix_.latitude = latitude;
+                // fix_.longitude = longitude;
+                // fix_.altitude = altitude;
+                // fix_.header.stamp = odom_.header.stamp;
+                // fix_.header.frame_id = s_frame_id_;
                 
-                inspva_.gps_week_number = atoi(aryNMEAstring[1].c_str());
-                inspva_.gps_week_milliseconds = static_cast<uint32_t>(atof(aryNMEAstring[2].c_str()) * 1000);
-                inspva_.latitude        =     in_latitude;
-                inspva_.longitude       =     in_longitude;
-                inspva_.height          =     in_altitude;
-                inspva_.north_velocity  =     velocity_y;
-                inspva_.east_velocity   =     velocity_x;
-                inspva_.up_velocity     =     velocity_z;
-                inspva_.roll            =     atof(aryNMEAstring[5].c_str());
-                inspva_.pitch           =     atof(aryNMEAstring[4].c_str());
-                inspva_.azimuth         =     atof(aryNMEAstring[3].c_str());
-                inspva_.status          =     fix_.status.status;
-                inspva_.header.stamp    = odom_.header.stamp;
-                inspva_.header.frame_id = s_frame_id_;
+                inspva_.gps_week_number       =     gps_week;
+                inspva_.gps_week_milliseconds =     static_cast<uint32_t>(gps_time * 1000);
+                inspva_.latitude              =     latitude;
+                inspva_.longitude             =     longitude;
+                inspva_.height                =     altitude;
+                inspva_.north_velocity        =     velocity_y;
+                inspva_.east_velocity         =     velocity_x;
+                inspva_.up_velocity           =     velocity_z;
+                inspva_.roll                  =     roll;
+                inspva_.pitch                 =     pitch;
+                inspva_.azimuth               =     yaw;
+                inspva_.status                =     status;
+                inspva_.header.stamp          =     ros::Time().now();
+                inspva_.header.frame_id       =     s_frame_id_;
+                inspva_.header.seq            =     nCounter;
 
-                navsat_pub_.publish(fix_);
-                odom_pub_.publish(odom_);
+                imu_.angular_velocity.x       =     velocity_x;
+                imu_.angular_velocity.y       =     velocity_y;
+                imu_.angular_velocity.z       =     velocity_z;
+                imu_.linear_acceleration.x    =     acc_x;
+                imu_.linear_acceleration.y    =     acc_y;
+                imu_.linear_acceleration.z    =     acc_z;
+                imu_.orientation              =     quat;
+                imu_.header.frame_id          =     s_frame_id_;
+                imu_.header.stamp             =     inspva_.header.stamp;
+                imu_.header.seq               =     nCounter;
+
+                // navsat_pub_.publish(fix_);
+                // odom_pub_.publish(odom_);
                 inspva_pub_.publish(inspva_);
+                navimu_pub_.publish(imu_);
               }
               else
               {
-                std::cout << "\033[1;31m [Abnormal GPS Data]:\033[0m [lat,lon,alt]= [" << atof(aryNMEAstring[2].c_str())
-                          << "," << atof(aryNMEAstring[4].c_str()) << "," << atof(aryNMEAstring[9].c_str()) << "]"
+                std::cout << "\033[1;31m [Abnormal GPS Data]:\033[0m [lat,lon,alt]= [" << latitude
+                          << "," << longitude << "," << altitude << "]"
                           << std::endl;
               }
             }
-            else if (boost::starts_with(serial_input_line[l], "$GTIMU") && aryNMEAstring.size() > 9) {
-               uint32_t gps_week = atoi(aryNMEAstring[1].c_str());
-               double gps_time = atof(aryNMEAstring[2].c_str());
-               double gyro_x = atof(aryNMEAstring[3].c_str()) / 180.0 * M_PI;
-               double gyro_y = atof(aryNMEAstring[4].c_str()) / 180.0 * M_PI;
-               double gyro_z = atof(aryNMEAstring[5].c_str()) / 180.0 * M_PI;
-               double acc_x = (atof(aryNMEAstring[6].c_str())) * 9.780;
-               double acc_y = atof(aryNMEAstring[7].c_str()) * 9.780;
-               double acc_z = atof(aryNMEAstring[8].c_str()) * 9.780;
+            // else if (boost::starts_with(serial_input_line[l], "$GTIMU") && aryNMEAstring.size() > 9) {
+            //    uint32_t gps_week = atoi(aryNMEAstring[1].c_str());
+            //    double gps_time = atof(aryNMEAstring[2].c_str());
+            //    double gyro_x = atof(aryNMEAstring[3].c_str()) / 180.0 * M_PI;
+            //    double gyro_y = atof(aryNMEAstring[4].c_str()) / 180.0 * M_PI;
+            //    double gyro_z = atof(aryNMEAstring[5].c_str()) / 180.0 * M_PI;
+            //    double acc_x = (atof(aryNMEAstring[6].c_str())) * 9.780;
+            //    double acc_y = atof(aryNMEAstring[7].c_str()) * 9.780;
+            //    double acc_z = atof(aryNMEAstring[8].c_str()) * 9.780;
 
-               if (!(isnan(gps_week) || isnan(gps_time) || isnan(gyro_x) || isnan(gyro_y) || isnan(gyro_z) ||
-                   isnan(acc_x) || isnan(acc_y) || isnan(acc_z))) {
-                 imu_.orientation = odom_.pose.pose.orientation;
-                 imu_.angular_velocity.x = gyro_x;
-                 imu_.angular_velocity.y = gyro_y;
-                 imu_.angular_velocity.z = gyro_z;
-                 imu_.linear_acceleration.x = acc_x;
-                 imu_.linear_acceleration.y = acc_y;
-                 imu_.linear_acceleration.z = acc_z;
-                 imu_.header.stamp = ros::Time().now();
-                 imu_.header.frame_id = s_frame_id_;
-                 navimu_pub_.publish(imu_);
-               }
-               else
-               {
-                 std::cout << "\033[1;31m [Abnormal IMU Data]:\033[0m [lat,lon,alt]= [" << atof(aryNMEAstring[1].c_str())
-                           << "," << atof(aryNMEAstring[2].c_str()) << "," << atof(aryNMEAstring[3].c_str()) << "]"
-                           << std::endl;
-               }
-             }
+            //    if (!(isnan(gps_week) || isnan(gps_time) || isnan(gyro_x) || isnan(gyro_y) || isnan(gyro_z) ||
+            //        isnan(acc_x) || isnan(acc_y) || isnan(acc_z))) {
+            //      imu_.orientation = odom_.pose.pose.orientation;
+            //      imu_.angular_velocity.x = gyro_x;
+            //      imu_.angular_velocity.y = gyro_y;
+            //      imu_.angular_velocity.z = gyro_z;
+            //      imu_.linear_acceleration.x = acc_x;
+            //      imu_.linear_acceleration.y = acc_y;
+            //      imu_.linear_acceleration.z = acc_z;
+            //      imu_.header.stamp = ros::Time().now();
+            //      imu_.header.frame_id = s_frame_id_;
+            //      navimu_pub_.publish(imu_);
+            //    }
+            //    else
+            //    {
+            //      std::cout << "\033[1;31m [Abnormal IMU Data]:\033[0m [lat,lon,alt]= [" << atof(aryNMEAstring[1].c_str())
+            //                << "," << atof(aryNMEAstring[2].c_str()) << "," << atof(aryNMEAstring[3].c_str()) << "]"
+            //                << std::endl;
+            //    }
+            //  }
           }
-          last_serial_input_line = serial_input_line[serial_input_line.size() - 1];
+          // last_serial_input_line = serial_input_line[serial_input_line.size() - 1];
           ++nCounter;
         }
       }
@@ -335,7 +353,7 @@ void GPSDriver::runGPS(const string& rsPort, const int nBaudRate)
       }
 
       //ros::spinOnce();
-      loop_rate.sleep();
+      // loop_rate.sleep();
     }
 
     port.close();
